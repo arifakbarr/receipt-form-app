@@ -6,7 +6,18 @@ import type { ReceiptFormData } from "@/lib/receipt-types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const DEFAULT_MODEL = "gemini-1.5-flash";
+/** Unversioned `gemini-1.5-flash` often 404s on v1beta; try current IDs in order. */
+const MODEL_FALLBACK_CHAIN = [
+  "gemini-2.0-flash",
+  "gemini-2.5-flash",
+  "gemini-1.5-flash-002",
+] as const;
+
+function isModelNotFoundError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const m = e.message;
+  return /\b404\b/.test(m) && /not found|is not found|not supported/i.test(m);
+}
 
 function parseJsonObject(content: string): Record<string, unknown> {
   const trimmed = content.trim();
@@ -61,45 +72,65 @@ export async function POST(req: Request) {
       ? mimeType
       : "image/jpeg";
 
-  const modelName = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  const envModel = process.env.GEMINI_MODEL?.trim();
+  const modelCandidates = envModel
+    ? [envModel]
+    : [...MODEL_FALLBACK_CHAIN];
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
 
-  try {
-    const result = await model.generateContent([
-      RECEIPT_EXTRACTION_INSTRUCTIONS,
-      {
-        inlineData: {
-          mimeType: mime,
-          data: imageBase64,
-        },
-      },
-    ]);
-
-    const text = result.response.text();
-    if (!text) {
-      return NextResponse.json(
-        { error: "No content from model" },
-        { status: 502 }
-      );
-    }
-
-    const parsed = parseJsonObject(text);
-    const data = normalizeExtracted(parsed);
-
-    return NextResponse.json({
-      data,
+  let lastError: unknown;
+  for (const modelName of modelCandidates) {
+    const model = genAI.getGenerativeModel({
       model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
     });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Extraction failed";
-    console.error("[extract]", e);
-    return NextResponse.json({ error: message }, { status: 502 });
+
+    try {
+      const result = await model.generateContent([
+        RECEIPT_EXTRACTION_INSTRUCTIONS,
+        {
+          inlineData: {
+            mimeType: mime,
+            data: imageBase64,
+          },
+        },
+      ]);
+
+      const text = result.response.text();
+      if (!text) {
+        return NextResponse.json(
+          { error: "No content from model" },
+          { status: 502 }
+        );
+      }
+
+      const parsed = parseJsonObject(text);
+      const data = normalizeExtracted(parsed);
+
+      return NextResponse.json({
+        data,
+        model: modelName,
+      });
+    } catch (e) {
+      lastError = e;
+      if (
+        modelCandidates.length > 1 &&
+        isModelNotFoundError(e) &&
+        modelName !== modelCandidates[modelCandidates.length - 1]
+      ) {
+        console.warn(`[extract] model ${modelName} unavailable, trying next`);
+        continue;
+      }
+      const message = e instanceof Error ? e.message : "Extraction failed";
+      console.error("[extract]", e);
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
   }
+
+  const message =
+    lastError instanceof Error ? lastError.message : "Extraction failed";
+  return NextResponse.json({ error: message }, { status: 502 });
 }
