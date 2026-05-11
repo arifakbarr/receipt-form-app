@@ -9,7 +9,7 @@ Extraction uses the **Google AI Studio free tier** ([Gemini API](https://ai.goog
 | Requirement | How this repo satisfies it |
 |-------------|----------------------------|
 | Upload a receipt image | Drag-and-drop or file picker (`ReceiptApp.tsx`). |
-| Generative AI API (Claude / GPT-4o / Gemini) | **Gemini** (tries `gemini-2.0-flash` → `gemini-2.5-flash` → `gemini-1.5-flash-002` until one works; override with `GEMINI_MODEL`). |
+| Generative AI API (Claude / GPT-4o / Gemini) | **Gemini** (tries `gemini-2.5-flash` → `gemini-1.5-flash-002` → `gemini-2.0-flash`; retries on 429; override with `GEMINI_MODEL`). |
 | Form pre-filled, user can review & edit | All four fields are populated from `/api/extract` and remain editable. |
 | Submit (DB optional) | `POST /api/submit` (in-memory) + **localStorage** history in the browser. |
 | Vercel deploy (optional) | Add `GEMINI_API_KEY` in Vercel → Environment Variables, then redeploy. |
@@ -42,7 +42,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Model and prompt
 
-- **Default models:** Google often drops unversioned IDs like `gemini-1.5-flash` (404). If `GEMINI_MODEL` is unset, the API route tries **`gemini-2.0-flash`**, then **`gemini-2.5-flash`**, then **`gemini-1.5-flash-002`**. Set **`GEMINI_MODEL`** to pin one model (see [Gemini models](https://ai.google.dev/gemini-api/docs/models)).
+- **Default models:** If `GEMINI_MODEL` is unset, the route tries **`gemini-2.5-flash`**, then **`gemini-1.5-flash-002`**, then **`gemini-2.0-flash`** (404s skip; **429** waits and retries, then tries the next model—free-tier quotas are **per model**). Pin one model with **`GEMINI_MODEL`** if you prefer. See [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) and [models](https://ai.google.dev/gemini-api/docs/models).
 - **Prompt:** `src/lib/extraction-prompt.ts` — asks for a single JSON object with `merchantName`, `date`, `totalAmount`, and `currency`.
 
 API logic: `src/app/api/extract/route.ts` (`@google/generative-ai`).
