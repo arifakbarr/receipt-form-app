@@ -64,7 +64,7 @@ export function ReceiptApp() {
   const [form, setForm] = useState<ReceiptFormData>(emptyReceiptForm());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastModel, setLastModel] = useState<string | null>(null);
+  const [hasExtracted, setHasExtracted] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<StoredSubmission[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -103,6 +103,7 @@ export function ReceiptApp() {
       }
       setError(null);
       setSubmitMessage(null);
+      setHasExtracted(false);
       resetPreview();
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
@@ -167,7 +168,7 @@ export function ReceiptApp() {
       }
       if (json.data) {
         setForm(json.data);
-        setLastModel(json.model ?? null);
+        setHasExtracted(true);
         setFormAnimKey((k) => k + 1);
       }
     } catch (err) {
@@ -218,7 +219,7 @@ export function ReceiptApp() {
 
   const clearForm = () => {
     setForm(emptyReceiptForm());
-    setLastModel(null);
+    setHasExtracted(false);
   };
 
   return (
@@ -247,7 +248,7 @@ export function ReceiptApp() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent)] opacity-40" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
               </span>
-              Gemini vision (free tier)
+              Smart receipt reading
             </span>
           </motion.div>
 
@@ -266,8 +267,8 @@ export function ReceiptApp() {
             variants={itemVariants}
             className="mx-auto mt-5 max-w-lg text-pretty text-base leading-relaxed text-[var(--muted)]"
           >
-            Drop a photo. Gemini reads the slip on the server—you steer the final
-            numbers before they are saved.
+            Drop a photo. We pull out merchant, date, and total for you—give
+            everything a quick look, then save when it looks right.
           </motion.p>
         </motion.header>
 
@@ -468,7 +469,7 @@ export function ReceiptApp() {
                       e.stopPropagation();
                       resetPreview();
                       setForm(emptyReceiptForm());
-                      setLastModel(null);
+                      setHasExtracted(false);
                       if (inputRef.current) inputRef.current.value = "";
                     }}
                     className="rounded-xl border border-[var(--border-strong)] bg-[var(--card-solid)] px-5 py-3 text-sm font-medium text-[var(--foreground)] backdrop-blur-sm hover:bg-[var(--card-inner)]"
@@ -480,17 +481,15 @@ export function ReceiptApp() {
             </div>
 
             <AnimatePresence>
-              {lastModel && (
+              {hasExtracted && (
                 <motion.p
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0 }}
-                  className="mt-4 text-xs text-[var(--muted)]"
+                  className="mt-4 text-xs leading-relaxed text-[var(--muted)]"
                 >
-                  Model{" "}
-                  <code className="rounded-md bg-[var(--card-inner)] px-2 py-0.5 font-mono text-[11px] text-[var(--foreground)]">
-                    {lastModel}
-                  </code>
+                  Receipt read—please double-check the numbers and date before
+                  you submit.
                 </motion.p>
               )}
             </AnimatePresence>
@@ -694,11 +693,9 @@ export function ReceiptApp() {
                     Recent submissions
                   </h2>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Stored in this browser only (
-                    <code className="rounded bg-[var(--card-inner)] px-1.5 py-0.5 text-xs">
-                      localStorage
-                    </code>
-                    ).
+                    These entries stay on this device only. They won&apos;t appear
+                    on your phone or another computer, and clearing this
+                    site&apos;s data will remove them.
                   </p>
                 </div>
               </div>
