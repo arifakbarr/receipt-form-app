@@ -8,9 +8,16 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+      fontFamily: {
+        display: ["var(--font-display)", "Georgia", "serif"],
+        ui: ["var(--font-ui)", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        glow: "0 0 40px -8px var(--accent-glow)",
+        "glow-sm": "0 0 24px -6px var(--accent-glow)",
+      },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },
