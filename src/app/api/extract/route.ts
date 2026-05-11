@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { RECEIPT_EXTRACTION_INSTRUCTIONS } from "@/lib/extraction-prompt";
 import type { ReceiptFormData } from "@/lib/receipt-types";
@@ -6,7 +6,7 @@ import type { ReceiptFormData } from "@/lib/receipt-types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-1.5-flash";
 
 function parseJsonObject(content: string): Record<string, unknown> {
   const trimmed = content.trim();
@@ -33,12 +33,12 @@ function normalizeExtracted(raw: Record<string, unknown>): ReceiptFormData {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "Missing OPENAI_API_KEY. Add it to .env.local (see README).",
+          "Missing GEMINI_API_KEY. Get a free key at https://aistudio.google.com/apikey and add it to .env.local (see README).",
       },
       { status: 500 }
     );
@@ -61,43 +61,41 @@ export async function POST(req: Request) {
       ? mimeType
       : "image/jpeg";
 
-  const openai = new OpenAI({ apiKey });
+  const modelName = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+  });
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: RECEIPT_EXTRACTION_INSTRUCTIONS },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mime};base64,${imageBase64}`,
-                detail: "high",
-              },
-            },
-          ],
+    const result = await model.generateContent([
+      RECEIPT_EXTRACTION_INSTRUCTIONS,
+      {
+        inlineData: {
+          mimeType: mime,
+          data: imageBase64,
         },
-      ],
-    });
+      },
+    ]);
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
+    const text = result.response.text();
+    if (!text) {
       return NextResponse.json(
         { error: "No content from model" },
         { status: 502 }
       );
     }
 
-    const parsed = parseJsonObject(content);
+    const parsed = parseJsonObject(text);
     const data = normalizeExtracted(parsed);
 
     return NextResponse.json({
       data,
-      model: MODEL,
+      model: modelName,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Extraction failed";

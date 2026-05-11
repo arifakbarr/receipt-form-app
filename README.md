@@ -1,16 +1,18 @@
 # Receipt-to-form auto-fill
 
-A small Next.js app that uploads a receipt image, calls **OpenAI GPT-4o-mini** (vision + JSON) to extract structured fields, shows an editable form, and saves submissions to **localStorage** (plus an optional in-memory record on the server).
+A small Next.js app that uploads a receipt image, calls **Google Gemini** (vision + JSON) on the server to extract structured fields, shows an editable form, and saves submissions to **localStorage** (plus an optional in-memory record on the server).
+
+Extraction uses the **Google AI Studio free tier** ([Gemini API](https://ai.google.dev/pricing)): add `GEMINI_API_KEY` locally and in Vercel—no paid OpenAI/Anthropic account required for typical assignment usage.
 
 ## Assignment checklist
 
 | Requirement | How this repo satisfies it |
 |-------------|----------------------------|
 | Upload a receipt image | Drag-and-drop or file picker (`ReceiptApp.tsx`). |
-| Generative AI API (Claude / GPT-4o / Gemini) | **OpenAI** (`gpt-4o-mini` default, `gpt-4o` optional). README notes how to swap to Claude/Gemini. |
+| Generative AI API (Claude / GPT-4o / Gemini) | **Gemini** (`gemini-1.5-flash` default; set `GEMINI_MODEL=gemini-2.0-flash` if you prefer). |
 | Form pre-filled, user can review & edit | All four fields are populated from `/api/extract` and remain editable. |
 | Submit (DB optional) | `POST /api/submit` (in-memory) + **localStorage** history in the browser. |
-| Vercel deploy (optional) | Steps below; needs your GitHub + Vercel account. |
+| Vercel deploy (optional) | Add `GEMINI_API_KEY` in Vercel → Environment Variables, then redeploy. |
 | Fields: merchant, date, total, currency | `ReceiptFormData` + extraction prompt JSON schema. |
 
 **Your deliverables (not in repo):** 1–2 min demo video, public GitHub URL after you push, live Vercel URL after you deploy.
@@ -18,21 +20,20 @@ A small Next.js app that uploads a receipt image, calls **OpenAI GPT-4o-mini** (
 ## Features
 
 - Drag-and-drop or file picker for receipt images (JPEG, PNG, GIF, WebP).
-- Server-side extraction via `/api/extract` so your API key stays off the client.
+- Server-side extraction via `/api/extract` so the API key never ships to the browser.
 - Fields: **merchant name**, **date**, **total amount**, **currency**.
 - Review and edit before submit; recent submissions listed from local storage.
 
 ## Prerequisites
 
 - Node.js 18+
-- An [OpenAI API key](https://platform.openai.com/api-keys) with access to vision-capable models (`gpt-4o-mini` or `gpt-4o`).
+- A **free** [Gemini API key](https://aistudio.google.com/apikey) from Google AI Studio (same key works for the free-tier quotas described on [Google AI pricing](https://ai.google.dev/pricing)).
 
 ## Setup
 
 ```bash
-# Windows (PowerShell): Copy-Item .env.example .env.local
 cp .env.example .env.local
-# Edit .env.local and set OPENAI_API_KEY
+# Edit .env.local: set GEMINI_API_KEY (from AI Studio)
 npm install
 npm run dev
 ```
@@ -41,26 +42,21 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Model and prompt
 
-- **Default model:** `gpt-4o-mini` (override with `OPENAI_VISION_MODEL` in `.env.local`).
-- **Prompt:** Defined in `src/lib/extraction-prompt.ts` as `RECEIPT_EXTRACTION_INSTRUCTIONS`. It asks for a single JSON object with `merchantName`, `date`, `totalAmount`, and `currency`, with ISO date and ISO 4217 currency when possible.
+- **Default model:** `gemini-1.5-flash` (override with `GEMINI_MODEL` in `.env.local`, e.g. `gemini-2.0-flash` when available on your key).
+- **Prompt:** `src/lib/extraction-prompt.ts` — asks for a single JSON object with `merchantName`, `date`, `totalAmount`, and `currency`.
 
-API logic lives in `src/app/api/extract/route.ts`.
+API logic: `src/app/api/extract/route.ts` (`@google/generative-ai`).
 
-### Using other providers (Claude / Gemini)
+### Using OpenAI or Claude instead
 
-This repo is wired for OpenAI out of the box. To use Anthropic or Google:
-
-1. Add the respective SDK and API route (or branch inside `extract` on an env var like `AI_PROVIDER`).
-2. Send the receipt image as base64 and reuse the same JSON schema and prompt text from `extraction-prompt.ts`.
+1. Add the provider SDK and branch in `extract/route.ts` (e.g. `AI_PROVIDER=openai|gemini`).
+2. Reuse the same prompt text and `ReceiptFormData` normalization.
 
 ## Deploy on Vercel
 
-Production URL (after you set env vars): **https://receipt-form-app.vercel.app**
-
 1. Push the project to GitHub.
-2. Import the repo in [Vercel](https://vercel.com) (this repo is already linked if you deployed via CLI).
-3. In the Vercel project → **Settings → Environment Variables**, add **`OPENAI_API_KEY`** (and optionally **`OPENAI_VISION_MODEL`**), then **Redeploy** so extraction works in production.
-4. Deploy.
+2. Import the repo in [Vercel](https://vercel.com).
+3. **Settings → Environment Variables:** add **`GEMINI_API_KEY`** (and optionally **`GEMINI_MODEL`**), then **Redeploy**.
 
 ## Demo video (1–2 minutes)
 
@@ -77,10 +73,10 @@ Tools: OBS, Windows Snipping Tool + Clipchamp, Loom, etc.
 
 Usually **not** a missing `error.tsx` file. Typical causes:
 
-1. **Two dev servers** on the same project (e.g. port 3000 and 3001 both running `next dev`) — stop every `node`/`next` for this app, delete `.next`, run **one** `npm run dev`.
-2. **Deleting `.next` while dev is running** or **running `npm run build` while `npm run dev` is still running** — stop the server, remove the `.next` folder, start dev again.
+1. **Two dev servers** on the same project — stop every `node`/`next` for this app, delete `.next`, run **one** `npm run dev`.
+2. **Deleting `.next` while dev is running** — stop the server, remove `.next`, start dev again.
 
-This repo includes `src/app/error.tsx` and `src/app/global-error.tsx` so runtime errors show a proper recovery UI instead of a broken overlay.
+This repo includes `src/app/error.tsx` and `src/app/global-error.tsx`.
 
 ## Scripts
 

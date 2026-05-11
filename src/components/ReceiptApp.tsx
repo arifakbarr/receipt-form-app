@@ -247,7 +247,7 @@ export function ReceiptApp() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent)] opacity-40" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
               </span>
-              Vision extraction
+              Gemini vision (free tier)
             </span>
           </motion.div>
 
@@ -266,8 +266,8 @@ export function ReceiptApp() {
             variants={itemVariants}
             className="mx-auto mt-5 max-w-lg text-pretty text-base leading-relaxed text-[var(--muted)]"
           >
-            Drop a photo. Our model reads the slip—you steer the final numbers
-            before they are saved.
+            Drop a photo. Gemini reads the slip on the server—you steer the final
+            numbers before they are saved.
           </motion.p>
         </motion.header>
 

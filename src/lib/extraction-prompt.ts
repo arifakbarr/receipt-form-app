@@ -1,5 +1,5 @@
 /**
- * System instructions sent with the receipt image. Documented in README for reproducibility.
+ * Instructions for vision models (Gemini, etc.). Keep JSON-only output for reliable parsing.
  */
 export const RECEIPT_EXTRACTION_INSTRUCTIONS = `You are an expert at reading retail and restaurant receipts.
 
